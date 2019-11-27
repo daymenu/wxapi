@@ -13,6 +13,10 @@ import (
 // HTTPPort HTTPPort
 const (
 	HTTPPort = 9190
+
+	ResponseSuccess = 0
+	LoginFaildCode  = 108 + iota
+	FetchFaildCode
 )
 
 type httpWechat struct {
@@ -22,7 +26,7 @@ type httpWechat struct {
 
 // Response Response
 type Response struct {
-	Code    string `json:"code"`
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 	UUID    string `json:"uuid"`
 }
@@ -42,11 +46,11 @@ func (hw *httpWechat) Qr(rw http.ResponseWriter, req *http.Request) {
 	defer hw.Unlock()
 	hw.wechat[uuid] = wx
 	if err != nil {
-		qrResp.Code = "1"
+		qrResp.Code = 1
 		qrResp.Message = err.Error()
 	}
 
-	qrResp.Code = "0"
+	qrResp.Code = 0
 	qrResp.Message = "获取成功"
 	qrResp.UUID = uuid
 	qrResp.QrURL = qrurl
@@ -85,18 +89,23 @@ func (hw *httpWechat) GetContactList(rw http.ResponseWriter, req *http.Request) 
 	rw.Header().Add("Content-Type", "application/json; charset=UTF-8")
 	type WebResp struct {
 		Response
-		LoginStatus string `json:"loginStatus"`
+		*wechat.ContractResponse
 	}
 	req.ParseForm()
 	uuid := req.Form.Get("uuid")
-	log.Printf("%+v", hw.wechat)
 	webResp := new(WebResp)
-	wechat, ok := hw.wechat[uuid]
-	if ok && wechat.IsLogin() {
-		webResp.LoginStatus = "0"
-	} else {
-		webResp.LoginStatus = "1"
+	ww, ok := hw.wechat[uuid]
+	log.Printf("uuid=%s %+v", uuid, ww)
+	if !ok {
+		webResp.Code = LoginFaildCode
+		webResp.Message = "请登录"
 	}
+	cr, err := ww.GetContactList()
+	if err != nil {
+		webResp.Code = FetchFaildCode
+		webResp.Message = "请求失败，请重试"
+	}
+	webResp.ContractResponse = cr
 	qrJSON, err := json.Marshal(webResp)
 	if err != nil {
 		log.Print(err)
@@ -113,12 +122,12 @@ func (hw *httpWechat) SendMessage(rw http.ResponseWriter, req *http.Request) {
 	message := req.Form.Get("message")
 	log.Printf("%+v", hw.wechat)
 	webResp := new(Response)
-	wechat, ok := hw.wechat[uuid]
+	ww, ok := hw.wechat[uuid]
 	if !ok {
-		webResp.Code = "1"
+		webResp.Code = LoginFaildCode
 		webResp.Message = "请先登录"
 	}
-	err := wechat.SendMsg(userName, message, false)
+	err := ww.SendMsg(userName, message, false)
 
 	qrJSON, err := json.Marshal(webResp)
 	if err != nil {
@@ -131,6 +140,7 @@ func main() {
 	hw := httpWechat{
 		wechat: make(map[string]*wechat.Wechat),
 	}
+
 	// check login
 	go hw.initLogin()
 

@@ -46,13 +46,14 @@ const (
 
 // url
 const (
-	LoginURL            = "https://login.weixin.qq.com/jslogin"
-	QrURL               = "https://login.weixin.qq.com/qrcode/"
+	LoginURL = "https://login.weixin.qq.com/jslogin"
+	QrURL    = "https://login.weixin.qq.com/qrcode/"
+
 	FetchLoginURL       = "https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login"
 	WxBaseURL           = "https://wx.qq.com/cgi-bin/mmwebwx-bin"
 	WebWxInitURL        = WxBaseURL + "/webwxinit"
-	WebWxContactListURL = WxBaseURL + "webwxgetcontact"
-	WebWxSendMsg        = WxBaseURL + "webwxsendmsg"
+	WebWxContactListURL = WxBaseURL + "/webwxgetcontact"
+	WebWxSendMsg        = WxBaseURL + "/webwxsendmsg"
 	TuringURL           = "http://www.tuling123.com/openapi/api"
 )
 
@@ -228,5 +229,5 @@ type MemberResp struct {
 type ContractResponse struct {
 	GroupMemberList []Member `json:"groupMembers"`
 	PublicUserList  []Member `json:"publicUsers"`
-	ContactList     []Member `json:"contacts`
+	ContactList     []Member `json:"contacts"`
 }

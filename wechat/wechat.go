@@ -26,8 +26,9 @@ func NewWechat() *Wechat {
 		Request: &Request{
 			BaseRequest: new(BaseRequest),
 		},
-		Response: Response{},
-		log:      getLogger(),
+		Response:  Response{},
+		MemberMap: map[string]Member{},
+		log:       getLogger(),
 	}
 }
 
@@ -220,6 +221,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 		}
 
 	}
+	contractResponse = &ContractResponse{}
 	contractResponse.GroupMemberList = w.GroupMemberList
 	contractResponse.PublicUserList = w.PublicUserList
 	contractResponse.ContactList = w.ContactList
@@ -227,6 +229,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	return
 }
 
+// SendMsg send message
 func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	if w.Request.BaseRequest.PassTicket == "" {
 		return fmt.Errorf("请重新登录")
