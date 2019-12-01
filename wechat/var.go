@@ -54,6 +54,7 @@ const (
 	WebWxInitURL        = WxBaseURL + "/webwxinit"
 	WebWxContactListURL = WxBaseURL + "/webwxgetcontact"
 	WebWxSendMsg        = WxBaseURL + "/webwxsendmsg"
+	WebSyncCheckURL     = WxBaseURL + "/synccheck"
 	TuringURL           = "http://www.tuling123.com/openapi/api"
 )
 
@@ -184,36 +185,36 @@ type Response struct {
 
 // Member member
 type Member struct {
-	Uin              int64
+	Uin              int64 `json:"-"`
 	UserName         string
 	NickName         string
 	HeadImgURL       string
-	ContactFlag      int
-	MemberCount      int
-	MemberList       []User
-	RemarkName       string
-	HideInputBarFlag int
-	Sex              int
-	Signature        string
-	VerifyFlag       int
-	OwnerUin         int
-	PYInitial        string
-	PYQuanPin        string
-	RemarkPYInitial  string
-	RemarkPYQuanPin  string
-	StarFriend       int
-	AppAccountFlag   int
-	Statues          int
-	AttrStatus       int
-	Province         string
-	City             string
-	Alias            string
-	SnsFlag          int
-	UniFriend        int
-	DisplayName      string
-	ChatRoomID       int `json:"ChatRoomId"`
-	KeyWord          string
-	EncryChatRoomID  string `json:"EncryChatRoomId"`
+	ContactFlag      int    `json:"-"`
+	MemberCount      int    `json:"-"`
+	MemberList       []User `json:"-"`
+	RemarkName       string `json:"-"`
+	HideInputBarFlag int    `json:"-"`
+	Sex              int    `json:"-"`
+	Signature        string `json:"-"`
+	VerifyFlag       int    `json:"-"`
+	OwnerUin         int    `json:"-"`
+	PYInitial        string `json:"-"`
+	PYQuanPin        string `json:"-"`
+	RemarkPYInitial  string `json:"-"`
+	RemarkPYQuanPin  string `json:"-"`
+	StarFriend       int    `json:"-"`
+	AppAccountFlag   int    `json:"-"`
+	Statues          int    `json:"-"`
+	AttrStatus       int    `json:"-"`
+	Province         string `json:"-"`
+	City             string `json:"-"`
+	Alias            string `json:"-"`
+	SnsFlag          int    `json:"-"`
+	UniFriend        int    `json:"-"`
+	DisplayName      string `json:"-"`
+	ChatRoomID       int    `json:"-"`
+	KeyWord          string `json:"-"`
+	EncryChatRoomID  string `json:"-"`
 }
 
 // MemberResp MemberResp
@@ -230,4 +231,25 @@ type ContractResponse struct {
 	GroupMemberList []Member `json:"groupMembers"`
 	PublicUserList  []Member `json:"publicUsers"`
 	ContactList     []Member `json:"contacts"`
+}
+
+// SyncCheckResp sync check resp
+type SyncCheckResp struct {
+	RetCode  int `json:"retcode"`
+	Selector int `json:"selector"`
+}
+
+// SyncParams sync params
+type SyncParams struct {
+	BaseRequest BaseRequest `json:"BaseRequest"`
+	SyncKey     SyncKey     `json:"SyncKey"`
+	RR          int64       `json:"rr"`
+}
+
+// SyncResp sync response
+type SyncResp struct {
+	Response
+	SyncKey      SyncKey       `json:"SyncKey"`
+	ContinueFlag int           `json:"ContinueFlag"`
+	AddMsgList   []interface{} `json:"AddMsgList"`
 }

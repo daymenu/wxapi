@@ -76,7 +76,7 @@ func (hw *httpWechat) Login(rw http.ResponseWriter, req *http.Request) {
 	}
 	req.ParseForm()
 	uuid := req.Form.Get("userId")
-	logger.Printf("qr:userId=%s request:%s  ip: %s", uuid, req.Form.Encode(), req.RemoteAddr)
+	logger.Printf("login :userId=%s request:%s  ip: %s", uuid, req.Form.Encode(), req.RemoteAddr)
 	webResp := new(WebResp)
 	wechat, ok := hw.wechat[uuid]
 	if ok && wechat.IsLogin() {
@@ -88,7 +88,7 @@ func (hw *httpWechat) Login(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Print(err)
 	}
-	logger.Printf("qr:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
+	logger.Printf("login:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
 	rw.Write(qrJSON)
 }
 
@@ -179,8 +179,8 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", HTTPPort)
 
-	fmt.Printf("wxapi start as %s\n", addr)
-	logger.Printf("wxapi start as %s", addr)
+	fmt.Printf("version:0.01 wxapi start as %s\n", addr)
+	logger.Printf("version:0.01 wxapi start as %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -50,13 +51,6 @@ func (w *Wechat) GetQr() (path string, err error) {
 		return
 	}
 	return w.qrImagePath, nil
-}
-
-func (w *Wechat) set() {
-	w.uuID = "oYLMjVpIwQ=="
-	w.qrImagePath = "/home/hanjian/work/go/gopl/wechat/qrimages/oYLMjVpIwQ==.jpg"
-	w.redirectedURL = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxnewloginpage?ticket=AfW4DZldIe1qYGg-OZB-JG2t@qrticket_0&uuid=oYLMjVpIwQ==&lang=zh-CN&scan=1574557489"
-	w.setBaseURL()
 }
 
 // Login login
@@ -219,7 +213,8 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	}
 	contractResponse = &ContractResponse{}
 	contractResponse.GroupMemberList = w.GroupMemberList
-	contractResponse.PublicUserList = w.PublicUserList
+	// 公众号先不返回了
+	// contractResponse.PublicUserList = w.PublicUserList
 	contractResponse.ContactList = w.ContactList
 	w.Log.Printf("webwxinit response : %+v", string(jsonStr))
 	return
@@ -396,6 +391,51 @@ func (w *Wechat) fetchForLogin(url string, code, redirectedURL chan<- string) {
 		redirectedURL <- result.Get("window.redirect_uri")
 	}
 	code <- result.Get("window.code")
+}
+
+// SyncCheck sync check
+func (w *Wechat) SyncCheck() (syncResp *SyncCheckResp, err error) {
+	params := url.Values{}
+	curTime := strconv.FormatInt(time.Now().Unix(), 10)
+	params.Set("r", curTime)
+	params.Set("sid", w.Request.BaseRequest.Wxsid)
+	params.Set("uin", strconv.FormatInt(int64(w.Request.BaseRequest.Wxuin), 10))
+	params.Set("sky", w.Request.BaseRequest.Skey)
+	params.Set("deviceid", w.SyncKeyStr)
+	params.Set("_", curTime)
+	checkURL, err := url.Parse(WebSyncCheckURL)
+	if err != nil {
+		return
+	}
+	checkURL.RawQuery = params.Encode()
+	w.Log.Printf(checkURL.String())
+	resp, err := w.Client.Get(checkURL.String())
+	if err != nil {
+		w.Log.Print("synccheck:", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		w.Log.Print("parse sync check err:", err)
+		return
+	}
+	bodyStr := string(body)
+	w.Log.Println(bodyStr)
+
+	syncResp = &SyncCheckResp{}
+	regexCompile := regexp.MustCompile(`window.synccheck={retcode:"(\d+)",selector:"(\d+)"}`)
+	pmSub := regexCompile.FindStringSubmatch(bodyStr)
+	w.Log.Printf("the data:%+v", pmSub)
+	if len(pmSub) != 0 {
+		syncResp.RetCode, err = strconv.Atoi(pmSub[1])
+		syncResp.Selector, err = strconv.Atoi(pmSub[2])
+		w.Log.Printf("sync resp: %+v", resp)
+	} else {
+		err = fmt.Errorf("regex error in window.redirect_uri")
+		return
+	}
+	return
 }
 
 // getHTTPClient http client
