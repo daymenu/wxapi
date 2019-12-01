@@ -91,7 +91,7 @@ type Wechat struct {
 	SpecialUserList []Member //特殊账号
 	GroupList       []string
 	MemberCount     int
-	log             *log.Logger
+	Log             *log.Logger
 }
 
 // BaseRequest login xml response

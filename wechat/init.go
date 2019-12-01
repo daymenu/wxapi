@@ -1,5 +1,0 @@
-package wechat
-
-func init() {
-
-}

@@ -19,7 +19,7 @@ import (
 )
 
 // NewWechat new wechat
-func NewWechat() *Wechat {
+func NewWechat(logger *log.Logger) *Wechat {
 	return &Wechat{
 		Client:   getHTTPClient(),
 		deviceID: getDeviceID(),
@@ -28,7 +28,7 @@ func NewWechat() *Wechat {
 		},
 		Response:  Response{},
 		MemberMap: map[string]Member{},
-		log:       getLogger(),
+		Log:       logger,
 	}
 }
 
@@ -41,12 +41,12 @@ func (w *Wechat) GetUUID() string {
 func (w *Wechat) GetQr() (path string, err error) {
 	err = w.fetchuuID()
 	if err != nil {
-		w.log.Printf("%s", err)
+		w.Log.Printf("%s", err)
 		return
 	}
 	err = w.fetchQr()
 	if err != nil {
-		w.log.Printf("%s", err)
+		w.Log.Printf("%s", err)
 		return
 	}
 	return w.qrImagePath, nil
@@ -83,14 +83,12 @@ func (w *Wechat) login() (err error) {
 		return
 	}
 	defer response.Body.Close()
-	// data, err := ioutil.ReadAll(response.Body)
-	// w.log.Print(string(data))
 	reader := response.Body.(io.Reader)
 	if err = xml.NewDecoder(reader).Decode(w.Request.BaseRequest); err != nil {
 		return
 	}
 	w.Request.BaseRequest.DeviceID = w.deviceID
-	w.log.Printf("login:%+v", w.Request.BaseRequest)
+	w.Log.Printf("login:%+v", w.Request.BaseRequest)
 	return nil
 }
 
@@ -109,10 +107,9 @@ func (w *Wechat) webwxinit() (err error) {
 	}
 	wxinitURL := fmt.Sprintf("%s?pass_ticket=%s", WebWxInitURL, w.Request.BaseRequest.PassTicket)
 	data, err := json.Marshal(w.Request)
-	w.log.Print(string(data))
 	response, err := w.Client.Post(wxinitURL, ContentTypeJSON, bytes.NewReader(data))
 	if err != nil {
-		w.log.Printf("get webwxinit :%v", WebWxInitURL)
+		w.Log.Printf("get webwxinit :%v", WebWxInitURL)
 		return
 	}
 
@@ -120,7 +117,7 @@ func (w *Wechat) webwxinit() (err error) {
 	reader := response.Body.(io.Reader)
 	// wxResponse := new(Response)
 	if err = json.NewDecoder(reader).Decode(&w.Response); err != nil {
-		w.log.Printf("webwxinit: %+v", err)
+		w.Log.Printf("webwxinit: %+v", err)
 		return
 	}
 	for _, contact := range w.Response.ContactList {
@@ -139,12 +136,12 @@ func (w *Wechat) webwxinit() (err error) {
 
 	}
 	cookies := response.Cookies()
-	w.log.Printf("cookie num: %+v", len(cookies))
+	w.Log.Printf("cookie num: %+v", len(cookies))
 	for cookie := range cookies {
-		w.log.Printf("cookie : %+v", cookie)
+		w.Log.Printf("cookie : %+v", cookie)
 	}
 	jsonStr, err := json.MarshalIndent(w.Response, "", "")
-	w.log.Printf("webwxinit response : %+v", string(jsonStr))
+	w.Log.Printf("webwxinit response : %+v", string(jsonStr))
 	if w.Response.BaseResponse.Ret != StatusSuccess {
 		return
 	}
@@ -153,7 +150,7 @@ func (w *Wechat) webwxinit() (err error) {
 
 // GetContactList GetContactList
 func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error) {
-	if w.Request.BaseRequest.PassTicket == "" {
+	if !w.IsLogin() {
 		return nil, fmt.Errorf("请重新登录")
 	}
 	wxurl := fmt.Sprintf("%s?pass_ticket=%s&skey=%s&r=%d",
@@ -164,10 +161,9 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	)
 
 	data, err := json.Marshal(w.Request)
-	w.log.Print(string(data))
 	response, err := w.Client.Post(wxurl, ContentTypeJSON, bytes.NewReader(data))
 	if err != nil {
-		w.log.Printf("get webwxgetcontact :%v", WebWxInitURL)
+		w.Log.Printf("get webwxgetcontact :%v", WebWxInitURL)
 		return nil, err
 	}
 
@@ -175,7 +171,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	reader := response.Body.(io.Reader)
 	wxResponse := new(MemberResp)
 	if err = json.NewDecoder(reader).Decode(&wxResponse); err != nil {
-		w.log.Printf("webwxgetcontact: %+v", err)
+		w.Log.Printf("webwxgetcontact: %+v", err)
 		return nil, err
 	}
 	if w.Response.BaseResponse.Ret != StatusSuccess {
@@ -225,13 +221,13 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	contractResponse.GroupMemberList = w.GroupMemberList
 	contractResponse.PublicUserList = w.PublicUserList
 	contractResponse.ContactList = w.ContactList
-	w.log.Printf("webwxinit response : %+v", string(jsonStr))
+	w.Log.Printf("webwxinit response : %+v", string(jsonStr))
 	return
 }
 
 // SendMsg send message
 func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
-	if w.Request.BaseRequest.PassTicket == "" {
+	if !w.IsLogin() {
 		return fmt.Errorf("请重新登录")
 	}
 	wxurl := fmt.Sprintf("%s?pass_ticket=%s&skey=%s&r=%d",
@@ -253,10 +249,9 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	msg["ToUserName"] = toUserName
 	params["Msg"] = msg
 	data, err := json.Marshal(params)
-	w.log.Print(string(data))
 	response, err := w.Client.Post(wxurl, ContentTypeJSON, bytes.NewReader(data))
 	if err != nil {
-		w.log.Printf("get SendMsg :%v", WebWxInitURL)
+		w.Log.Printf("get SendMsg :%v", WebWxInitURL)
 		return err
 	}
 
@@ -264,7 +259,7 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	reader := response.Body.(io.Reader)
 	wxResponse := new(MemberResp)
 	if err = json.NewDecoder(reader).Decode(&wxResponse); err != nil {
-		w.log.Printf("SendMsg: %+v", err)
+		w.Log.Printf("SendMsg: %+v", err)
 		return err
 	}
 	if w.Response.BaseResponse.Ret != StatusSuccess {
@@ -296,7 +291,7 @@ func (w *Wechat) fetchuuID() (err error) {
 		return fmt.Errorf("GetuuID: not found uuid")
 	}
 	w.uuID = wr.Get(uuIDStr)
-	w.log.Printf("uuID:%s", w.uuID)
+	w.Log.Printf("uuID:%s", w.uuID)
 	return nil
 }
 
@@ -339,14 +334,14 @@ func (w *Wechat) fetchQr() error {
 	// }
 	// w.qrImagePath = filePath
 
-	// w.log.Printf("qrImagePath:%s", w.qrImagePath)
+	// w.Log.Printf("qrImagePath:%s", w.qrImagePath)
 	return nil
 }
 
 func (w *Wechat) setBaseURL() {
 	url, err := url.Parse(w.redirectedURL)
 	if err != nil {
-		w.log.Print(err)
+		w.Log.Print(err)
 	}
 	w.baseURL = fmt.Sprintf("%s://%s%s", url.Scheme, url.Hostname(), url.Path)
 }
@@ -375,11 +370,11 @@ func (w *Wechat) waitForLogin() error {
 				go w.fetchForLogin(loginURL, code, redirectedURL)
 			} else {
 				w.redirectedURL = <-redirectedURL
-				w.log.Printf("redirectedURL: %s", w.redirectedURL)
+				w.Log.Printf("redirectedURL: %s", w.redirectedURL)
 				return nil
 			}
 		case <-time.After(LoginTimeout * time.Second):
-			w.log.Print("Login is timeout")
+			w.Log.Print("Login is timeout")
 			return fmt.Errorf("Login is timeout")
 		}
 	}
