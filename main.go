@@ -190,8 +190,10 @@ func (hw *httpWechat) initLogin() {
 		if hw.wechat == nil {
 			continue
 		}
-		for _, w := range hw.wechat {
+		for userID, w := range hw.wechat {
+			logger.Printf("check %s login ....", userID)
 			if !w.IsLogin() {
+				logger.Printf("userId : %s no login", userID)
 				w.Login()
 			}
 		}
