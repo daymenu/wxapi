@@ -4,12 +4,20 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
 // GetLogger get loger
 func GetLogger() *log.Logger {
-	logDir := "/var/log/wxapi/"
+	goos := runtime.GOOS
+	var logDir string
+	switch goos {
+	case "windows":
+		logDir = os.TempDir()
+	default:
+		logDir = "/var/log/wxapi/"
+	}
 	err := os.Mkdir(logDir, 0777)
 	isExit := os.IsExist(err)
 	if !isExit && err != nil {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/daymenu/wxapi/wechat"
 )
@@ -190,12 +191,16 @@ func (hw *httpWechat) initLogin() {
 		if hw.wechat == nil {
 			continue
 		}
+		hw.RLock()
+		fmt.Println(hw.wechat)
+		time.Sleep(1 * time.Second)
 		for userID, w := range hw.wechat {
 			logger.Printf("check %s login ....", userID)
 			if !w.IsLogin() {
 				logger.Printf("userId : %s no login", userID)
-				w.Login()
+				go w.Login()
 			}
 		}
+		hw.RUnlock()
 	}
 }
