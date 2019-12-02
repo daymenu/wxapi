@@ -179,8 +179,8 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", HTTPPort)
 
-	fmt.Printf("version:0.01 wxapi start as %s\n", addr)
-	logger.Printf("version:0.01 wxapi start as %s", addr)
+	fmt.Printf("version:0.02 wxapi start as %s\n", addr)
+	logger.Printf("version:0.02 wxapi start as %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
