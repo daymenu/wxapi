@@ -187,20 +187,26 @@ func main() {
 
 // 常驻线程 检查是否有人登录了
 func (hw *httpWechat) initLogin() {
+	checkNum := map[string]int{}
 	for {
 		if hw.wechat == nil {
 			continue
 		}
-		hw.RLock()
-		fmt.Println(hw.wechat)
 		time.Sleep(1 * time.Second)
 		for userID, w := range hw.wechat {
+			checkNum[userID]++
+			if checkNum[userID] > 60 {
+				checkNum[userID] = 0
+				hw.Lock()
+				delete(hw.wechat, userID)
+				hw.Unlock()
+				continue
+			}
 			logger.Printf("check %s login ....", userID)
 			if !w.IsLogin() {
 				logger.Printf("userId : %s no login", userID)
 				go w.Login()
 			}
 		}
-		hw.RUnlock()
 	}
 }
