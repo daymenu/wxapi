@@ -68,7 +68,10 @@ func (w *Wechat) Login() (err error) {
 
 // login fetch common params
 func (w *Wechat) login() (err error) {
-	w.waitForLogin()
+	err = w.waitForLogin()
+	if err != nil {
+		return
+	}
 	if w.redirectedURL == "" {
 		return
 	}
@@ -370,6 +373,7 @@ func (w *Wechat) waitForLogin() error {
 			}
 		case <-time.After(LoginTimeout * time.Second):
 			w.Log.Print("Login is timeout")
+			fmt.Println("login hahahahah")
 			return fmt.Errorf("Login is timeout")
 		}
 	}

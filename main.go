@@ -180,8 +180,8 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", HTTPPort)
 
-	fmt.Printf("version:0.02 wxapi start as %s\n", addr)
-	logger.Printf("version:0.02 wxapi start as %s", addr)
+	fmt.Printf("version:0.03 wxapi start as %s\n", addr)
+	logger.Printf("version:0.03 wxapi start as %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
@@ -195,16 +195,14 @@ func (hw *httpWechat) initLogin() {
 		time.Sleep(1 * time.Second)
 		for userID, w := range hw.wechat {
 			checkNum[userID]++
-			if checkNum[userID] > 60 {
+			if checkNum[userID] > 600 {
 				checkNum[userID] = 0
 				hw.Lock()
 				delete(hw.wechat, userID)
 				hw.Unlock()
 				continue
 			}
-			logger.Printf("check %s login ....", userID)
 			if !w.IsLogin() {
-				logger.Printf("userId : %s no login", userID)
 				go w.Login()
 			}
 		}

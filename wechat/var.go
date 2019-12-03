@@ -10,7 +10,7 @@ import (
 const (
 	StatusSuccess       = 0
 	WxResultSuccessCode = "200"
-	LoginTimeout        = 40
+	LoginTimeout        = 500
 )
 
 // brower
