@@ -56,25 +56,28 @@ func (w *Wechat) GetQr() (path string, err error) {
 
 // Login login
 func (w *Wechat) Login(ctx context.Context) (err error) {
-	fmt.Println(w.GetUUID(), "Login start")
+	w.Log.Printf("%s Login start", w.GetUUID())
 	err = w.login(ctx)
 	if err != nil {
-		return
-	}
-	err = w.webwxinit()
-	if err != nil {
+		w.Log.Printf("%s Login faild： error:%s", w.GetUUID(), err.Error())
 		return
 	}
 
-	fmt.Println("Login end")
+	w.Log.Printf("%s webwxinit start", w.GetUUID())
+	err = w.webwxinit()
+	if err != nil {
+		w.Log.Printf("%s webwxinit faild： error:%s", w.GetUUID(), err.Error())
+		return
+	}
+	w.Log.Printf("%s Login success", w.GetUUID())
 	return
 }
 
 // login fetch common params
 func (w *Wechat) login(ctx context.Context) (err error) {
-	fmt.Println("login start")
 	err = w.waitForLogin(ctx)
 	if err != nil {
+		w.Log.Printf("%s login faild： error:%s", w.GetUUID(), err.Error())
 		return
 	}
 	if w.redirectedURL == "" {
@@ -82,16 +85,17 @@ func (w *Wechat) login(ctx context.Context) (err error) {
 	}
 	response, err := w.Client.Get(w.redirectedURL + "&fun=new")
 	if err != nil {
+		w.Log.Printf("%s login faild： error:%s", w.GetUUID(), err.Error())
 		return
 	}
 	defer response.Body.Close()
 	reader := response.Body.(io.Reader)
 	if err = xml.NewDecoder(reader).Decode(w.Request.BaseRequest); err != nil {
+		w.Log.Printf("%s login faild： error:%s", w.GetUUID(), err.Error())
 		return
 	}
 	w.Request.BaseRequest.DeviceID = w.deviceID
-	w.Log.Printf("login:%+v", w.Request.BaseRequest)
-	fmt.Println("login end")
+	w.Log.Printf("login success:%+v", w.Request.BaseRequest)
 	return nil
 }
 
@@ -156,6 +160,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	if !w.IsLogin() {
 		return nil, fmt.Errorf("请重新登录")
 	}
+	w.Log.Printf("%s GetContactList start", w.GetUUID())
 	wxurl := fmt.Sprintf("%s?pass_ticket=%s&skey=%s&r=%d",
 		WebWxContactListURL,
 		w.Request.BaseRequest.PassTicket,
@@ -167,6 +172,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	response, err := w.Client.Post(wxurl, ContentTypeJSON, bytes.NewReader(data))
 	if err != nil {
 		w.Log.Printf("get webwxgetcontact :%v", WebWxInitURL)
+		w.Log.Printf("%s GetContactList faild: %s", w.GetUUID(), err.Error())
 		return nil, err
 	}
 
@@ -174,9 +180,12 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	reader := response.Body.(io.Reader)
 	wxResponse := new(MemberResp)
 	if err = json.NewDecoder(reader).Decode(&wxResponse); err != nil {
+		w.Log.Printf("%s GetContactList parse json faild: %s", w.GetUUID(), err.Error())
 		w.Log.Printf("webwxgetcontact: %+v", err)
 		return nil, err
 	}
+	respjson, err := json.Marshal(wxResponse)
+	w.Log.Printf("%s GetContactList resp: %s", w.GetUUID(), string(respjson))
 	if w.Response.BaseResponse.Ret != StatusSuccess {
 		return nil, fmt.Errorf(w.Response.BaseResponse.ErrMsg)
 	}
@@ -225,7 +234,7 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 	// 公众号先不返回了
 	// contractResponse.PublicUserList = w.PublicUserList
 	contractResponse.ContactList = w.ContactList
-	w.Log.Printf("webwxinit response : %+v", string(jsonStr))
+	w.Log.Printf("GetContactList response : %+v", string(jsonStr))
 	return
 }
 
@@ -234,6 +243,7 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	if !w.IsLogin() {
 		return fmt.Errorf("请重新登录")
 	}
+	w.Log.Printf("%s sendMsg: toUserName:%s;message:%s", w.GetUUID(), toUserName, message)
 	wxurl := fmt.Sprintf("%s?pass_ticket=%s&skey=%s&r=%d",
 		WebWxSendMsg,
 		w.Request.BaseRequest.PassTicket,
@@ -255,7 +265,7 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	data, err := json.Marshal(params)
 	response, err := w.Client.Post(wxurl, ContentTypeJSON, bytes.NewReader(data))
 	if err != nil {
-		w.Log.Printf("get SendMsg :%v", WebWxInitURL)
+		w.Log.Printf("%s get SendMsg faild:%s", w.GetUUID(), err.Error())
 		return err
 	}
 
@@ -263,13 +273,13 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	reader := response.Body.(io.Reader)
 	wxResponse := new(MemberResp)
 	if err = json.NewDecoder(reader).Decode(&wxResponse); err != nil {
-		w.Log.Printf("SendMsg: %+v", err)
+		w.Log.Printf("%s json decode SendMsg: %+v", w.GetUUID(), err)
 		return err
 	}
 	if w.Response.BaseResponse.Ret != StatusSuccess {
 		return fmt.Errorf(w.Response.BaseResponse.ErrMsg)
 	}
-
+	w.Log.Printf("%s SendMsg success", w.GetUUID())
 	return
 }
 
@@ -352,8 +362,7 @@ func (w *Wechat) setBaseURL() {
 
 // waitForLogin fetch login status
 func (w *Wechat) waitForLogin(ctx context.Context) error {
-
-	fmt.Println("waitForLogin start")
+	w.Log.Printf("%s waitForLogin start", w.GetUUID())
 
 	if w.uuID == "" {
 		return nil
@@ -382,21 +391,23 @@ func (w *Wechat) waitForLogin(ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
+			w.Log.Printf("%s waitForLogin faild: 登录超时", w.GetUUID())
 			return fmt.Errorf("登录超时")
 		}
-		fmt.Println("for login haha")
 	}
 }
 
 func (w *Wechat) fetchForLogin(url string) (redirectedURL string, er error) {
-	fmt.Println("fetchForLogin satrt")
+	w.Log.Printf("%s fetchForLogin start", w.GetUUID())
 	response, err := w.Client.Get(url)
 	if err != nil {
+		w.Log.Printf("%s fetchForLogin faild: %s", w.GetUUID(), err.Error())
 		return
 	}
 	defer response.Body.Close()
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
+		w.Log.Printf("%s fetchForLogin faild: %s", w.GetUUID(), err.Error())
 		return
 	}
 	w.Log.Println(string(data))
@@ -405,7 +416,7 @@ func (w *Wechat) fetchForLogin(url string) (redirectedURL string, er error) {
 	if windowCode == WxResultSuccessCode {
 		redirectedURL = result.Get("window.redirect_uri")
 	}
-	fmt.Println("fetchForLogin end")
+	w.Log.Printf("%s fetchForLogin success", w.GetUUID())
 	return
 }
 
