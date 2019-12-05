@@ -2,6 +2,7 @@ package wechat
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"encoding/xml"
@@ -54,8 +55,9 @@ func (w *Wechat) GetQr() (path string, err error) {
 }
 
 // Login login
-func (w *Wechat) Login() (err error) {
-	err = w.login()
+func (w *Wechat) Login(ctx context.Context) (err error) {
+	fmt.Println(w.GetUUID(), "Login start")
+	err = w.login(ctx)
 	if err != nil {
 		return
 	}
@@ -63,12 +65,15 @@ func (w *Wechat) Login() (err error) {
 	if err != nil {
 		return
 	}
+
+	fmt.Println("Login end")
 	return
 }
 
 // login fetch common params
-func (w *Wechat) login() (err error) {
-	err = w.waitForLogin()
+func (w *Wechat) login(ctx context.Context) (err error) {
+	fmt.Println("login start")
+	err = w.waitForLogin(ctx)
 	if err != nil {
 		return
 	}
@@ -86,6 +91,7 @@ func (w *Wechat) login() (err error) {
 	}
 	w.Request.BaseRequest.DeviceID = w.deviceID
 	w.Log.Printf("login:%+v", w.Request.BaseRequest)
+	fmt.Println("login end")
 	return nil
 }
 
@@ -345,7 +351,10 @@ func (w *Wechat) setBaseURL() {
 }
 
 // waitForLogin fetch login status
-func (w *Wechat) waitForLogin() error {
+func (w *Wechat) waitForLogin(ctx context.Context) error {
+
+	fmt.Println("waitForLogin start")
+
 	if w.uuID == "" {
 		return nil
 	}
@@ -356,45 +365,48 @@ func (w *Wechat) waitForLogin() error {
 	params.Encode()
 	loginURL := FetchLoginURL + "?" + params.Encode()
 
-	code := make(chan string)
-	redirectedURL := make(chan string, 1)
-
-	go func() { code <- "start" }()
+	loginTicker := time.NewTicker(5 * time.Second)
+	fmt.Println(loginURL, loginTicker)
 	for {
 		select {
-		case success := <-code:
-			if success != WxResultSuccessCode {
-				time.Sleep(10 * time.Second)
-				go w.fetchForLogin(loginURL, code, redirectedURL)
-			} else {
-				w.redirectedURL = <-redirectedURL
-				w.Log.Printf("redirectedURL: %s", w.redirectedURL)
+		case <-loginTicker.C:
+			go func(ctx context.Context) {
+				fmt.Println(time.Now())
+				redirectedURL, err := w.fetchForLogin(loginURL)
+				if err != nil {
+					return
+				}
+				w.redirectedURL = redirectedURL
+			}(ctx)
+			if w.redirectedURL != "" {
 				return nil
 			}
-		case <-time.After(LoginTimeout * time.Second):
-			w.Log.Print("Login is timeout")
-			fmt.Println("login hahahahah")
-			return fmt.Errorf("Login is timeout")
+		case <-ctx.Done():
+			return fmt.Errorf("登录超时")
 		}
+		fmt.Println("for login haha")
 	}
 }
 
-func (w *Wechat) fetchForLogin(url string, code, redirectedURL chan<- string) {
+func (w *Wechat) fetchForLogin(url string) (redirectedURL string, er error) {
+	fmt.Println("fetchForLogin satrt")
 	response, err := w.Client.Get(url)
 	if err != nil {
-		code <- "faild"
+		return
 	}
 	defer response.Body.Close()
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		code <- "faild"
+		return
 	}
+	w.Log.Println(string(data))
 	result := ParseJsResult(data)
 	windowCode := result.Get("window.code")
 	if windowCode == WxResultSuccessCode {
-		redirectedURL <- result.Get("window.redirect_uri")
+		redirectedURL = result.Get("window.redirect_uri")
 	}
-	code <- result.Get("window.code")
+	fmt.Println("fetchForLogin end")
+	return
 }
 
 // SyncCheck sync check

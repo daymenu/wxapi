@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -34,6 +35,8 @@ type Response struct {
 
 var logger = wechat.GetLogger()
 
+var wechatChan = make(chan *wechat.Wechat, 500)
+
 func (hw *httpWechat) Qr(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Add("Content-Type", "application/json; charset=UTF-8")
 	type qr struct {
@@ -48,6 +51,10 @@ func (hw *httpWechat) Qr(rw http.ResponseWriter, req *http.Request) {
 	wx := wechat.NewWechat(logger)
 
 	qrurl, err := wx.GetQr()
+
+	// 放入待处理带缓存的channel
+	wechatChan <- wx
+
 	hw.Lock()
 	defer hw.Unlock()
 	hw.wechat[uuid] = wx
@@ -169,7 +176,8 @@ func main() {
 	}
 
 	// check login
-	go hw.initLogin()
+	ctx := context.Background()
+	go hw.initLogin(ctx)
 
 	mux := http.NewServeMux()
 
@@ -186,25 +194,12 @@ func main() {
 }
 
 // 常驻线程 检查是否有人登录了
-func (hw *httpWechat) initLogin() {
-	checkNum := map[string]int{}
-	for {
-		if hw.wechat == nil {
-			continue
-		}
-		time.Sleep(1 * time.Second)
-		for userID, w := range hw.wechat {
-			checkNum[userID]++
-			if checkNum[userID] > 600 {
-				checkNum[userID] = 0
-				hw.Lock()
-				delete(hw.wechat, userID)
-				hw.Unlock()
-				continue
-			}
-			if !w.IsLogin() {
-				go w.Login()
-			}
+func (hw *httpWechat) initLogin(ctx context.Context) {
+	for wx := range wechatChan {
+		if !wx.IsLogin() {
+			loginCtx, cancel := context.WithDeadline(ctx, time.Now().Add(360*time.Second))
+			fmt.Println(cancel)
+			go wx.Login(loginCtx)
 		}
 	}
 }
