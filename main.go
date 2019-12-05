@@ -19,6 +19,7 @@ const (
 	ResponseSuccess = 0
 	LoginFaildCode  = 108 + iota
 	FetchFaildCode
+	SendMessage
 )
 
 type httpWechat struct {
@@ -170,6 +171,41 @@ func (hw *httpWechat) SendMessage(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(qrJSON)
 }
 
+func (hw *httpWechat) SendImg(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Add("Content-Type", "application/json; charset=UTF-8")
+
+	req.ParseForm()
+	uuid := req.Form.Get("userId")
+	userName := req.Form.Get("userName")
+	path := req.Form.Get("path")
+
+	logger.Printf("SendImg:userId=%s request:%s ip: %s", uuid, req.Form.Encode(), req.RemoteAddr)
+	webResp := new(Response)
+	ww, ok := hw.wechat[uuid]
+	if !ok {
+		webResp.Code = LoginFaildCode
+		webResp.Message = "请先登录"
+		qrJSON, err := json.Marshal(webResp)
+		if err != nil {
+			log.Print(err)
+		}
+		logger.Printf("SendImg:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
+		rw.Write(qrJSON)
+		return
+	}
+	err := ww.SendMedia(userName, path)
+	if err != nil {
+		webResp.Message = err.Error()
+		webResp.Code = SendMessage
+	}
+	qrJSON, err := json.Marshal(webResp)
+	if err != nil {
+		log.Print(err)
+	}
+	logger.Printf("SendImg:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
+	rw.Write(qrJSON)
+}
+
 func main() {
 	hw := httpWechat{
 		wechat: make(map[string]*wechat.Wechat),
@@ -185,6 +221,7 @@ func main() {
 	mux.HandleFunc("/checkLogin", hw.Login)
 	mux.HandleFunc("/getContactList", hw.GetContactList)
 	mux.HandleFunc("/sendMessage", hw.SendMessage)
+	mux.HandleFunc("/sendImg", hw.SendImg)
 
 	addr := fmt.Sprintf(":%d", HTTPPort)
 
@@ -193,7 +230,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
-// 常驻线程 检查是否有人登录了
+// 常驻线程 检查是否有人登录了/media/madison/工作/vue/vue-element-admin/src/assets/401_images/401.gif
 func (hw *httpWechat) initLogin(ctx context.Context) {
 	for wx := range wechatChan {
 		if !wx.IsLogin() {
@@ -202,4 +239,8 @@ func (hw *httpWechat) initLogin(ctx context.Context) {
 			go wx.Login(loginCtx)
 		}
 	}
+}
+
+func (hw *httpWechat) syncCheck() {
+
 }

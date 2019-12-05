@@ -11,9 +11,11 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -283,6 +285,113 @@ func (w *Wechat) SendMsg(toUserName, message string, isFile bool) (err error) {
 	return
 }
 
+// SendMedia 发送图片
+func (w *Wechat) SendMedia(toUserName, mediaPath string) error {
+	if !w.IsLogin() {
+		return fmt.Errorf("请重新登录")
+	}
+	w.Log.Printf("%s SendMedia: toUserName:%s;mediaPath:%s", w.GetUUID(), toUserName, mediaPath)
+
+	mediaID, err := w.UploadMedia(mediaPath)
+	if err != nil {
+		w.Log.Printf("%s UploadMedia faild: mediaPath=%s", w.GetUUID(), mediaPath)
+		return err
+	}
+	wxurl := fmt.Sprintf("%s?pass_ticket=%s&fun=async&skey=%s&r=%d",
+		WebSendMediaURL,
+		w.Request.BaseRequest.PassTicket,
+		w.Request.BaseRequest.Skey,
+		time.Now().Unix(),
+	)
+	clientMsgID := fmt.Sprintf("%d0%s", time.Now().Unix(), strconv.Itoa(rand.Int())[3:6])
+	params := make(map[string]interface{})
+	params["BaseRequest"] = w.Request.BaseRequest
+	msg := make(map[string]interface{})
+	msg["Type"] = 1
+	msg["Content"] = ""
+	msg["MediaId"] = mediaID
+	msg["FromUserName"] = w.User.UserName
+	msg["LocalID"] = clientMsgID
+	msg["ClientMsgId"] = clientMsgID
+	msg["ToUserName"] = toUserName
+	params["Msg"] = msg
+	data, err := json.Marshal(params)
+	response, err := w.Client.Post(wxurl, ContentTypeJSON, bytes.NewReader(data))
+	if err != nil {
+		w.Log.Printf("%s get SendMsg faild:%s", w.GetUUID(), err.Error())
+		return err
+	}
+
+	defer response.Body.Close()
+	reader := response.Body.(io.Reader)
+	wxResponse := new(MemberResp)
+	if err = json.NewDecoder(reader).Decode(&wxResponse); err != nil {
+		w.Log.Printf("%s json decode SendMsg: %+v", w.GetUUID(), err)
+		return err
+	}
+	if w.Response.BaseResponse.Ret != StatusSuccess {
+		return fmt.Errorf(w.Response.BaseResponse.ErrMsg)
+	}
+	w.Log.Printf("%s SendMsg success", w.GetUUID())
+	return nil
+}
+
+// UploadMedia 上传图片
+func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
+
+	if !w.IsLogin() {
+		err = fmt.Errorf("请重新登录")
+		return
+	}
+	w.Log.Printf("%s UploadMedia: mediaPath:%s", w.GetUUID(), mediaPath)
+
+	bodyBuf := bytes.NewBufferString("")
+	bodyWriter := multipart.NewWriter(bodyBuf)
+
+	_, err = bodyWriter.CreateFormFile("name", "haha.jpg")
+	if err != nil {
+		w.Log.Printf("UploadMedia: %s bodyWriter.CreateFormFile faild %+v", w.GetUUID(), err)
+		return
+	}
+	f, err := os.Open(mediaPath)
+	if err != nil {
+		w.Log.Printf("UploadMedia: %s open faild %+v", w.GetUUID(), err)
+		return
+	}
+	boundary := bodyWriter.Boundary()
+	closeBuf := bytes.NewBufferString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
+	requestReader := io.MultiReader(bodyBuf, f, closeBuf)
+	stat, err := f.Stat()
+	if err != nil {
+		w.Log.Printf("UploadMedia: %s: f stat faild", w.GetUUID())
+	}
+
+	wxurl := fmt.Sprintf("%s?pass_ticket=%s&fun=async&skey=%s&r=%d",
+		WebSendMediaURL,
+		w.Request.BaseRequest.PassTicket,
+		w.Request.BaseRequest.Skey,
+		time.Now().Unix(),
+	)
+	req, err := http.NewRequest(http.MethodPost, wxurl, requestReader)
+	if err != nil {
+		return
+	}
+	req.Header.Add("Content-Type", "multipart/form-data;boundary="+boundary)
+	req.ContentLength = stat.Size() + int64(bodyBuf.Len()) + int64(closeBuf.Len())
+	fmt.Println(wxurl)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	mediaResp := new(MediaResponse)
+	if err = json.NewDecoder(resp.Body).Decode(mediaResp); err != nil {
+		return
+	}
+
+	return mediaResp.MediaID, nil
+}
+
 // fetchuuID get uuid
 func (w *Wechat) fetchuuID() (err error) {
 	uuIDStr := "window.QRLogin.uuid"
@@ -422,6 +531,7 @@ func (w *Wechat) fetchForLogin(url string) (redirectedURL string, er error) {
 
 // SyncCheck sync check
 func (w *Wechat) SyncCheck() (syncResp *SyncCheckResp, err error) {
+	w.Log.Printf("SyncCheck: %s start", w.GetUUID())
 	params := url.Values{}
 	curTime := strconv.FormatInt(time.Now().Unix(), 10)
 	params.Set("r", curTime)
@@ -432,19 +542,20 @@ func (w *Wechat) SyncCheck() (syncResp *SyncCheckResp, err error) {
 	params.Set("_", curTime)
 	checkURL, err := url.Parse(WebSyncCheckURL)
 	if err != nil {
+		w.Log.Printf("SyncCheck: %s faild: %+v", w.GetUUID(), err)
 		return
 	}
 	checkURL.RawQuery = params.Encode()
 	w.Log.Printf(checkURL.String())
 	resp, err := w.Client.Get(checkURL.String())
 	if err != nil {
-		w.Log.Print("synccheck:", err)
+		w.Log.Printf("SyncCheck: %s get faild: %+v", w.GetUUID(), err)
 		return
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		w.Log.Print("parse sync check err:", err)
+		w.Log.Printf("SyncCheck: %s read body faild: %+v", w.GetUUID(), err)
 		return
 	}
 	bodyStr := string(body)

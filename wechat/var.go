@@ -55,6 +55,8 @@ const (
 	WebWxContactListURL = WxBaseURL + "/webwxgetcontact"
 	WebWxSendMsg        = WxBaseURL + "/webwxsendmsg"
 	WebSyncCheckURL     = WxBaseURL + "/synccheck"
+	WebUploadMediaURL   = WxBaseURL + "/webwxuploadmedia"
+	WebSendMediaURL     = WxBaseURL + "/webwxsendmsgimg"
 	TuringURL           = "http://www.tuling123.com/openapi/api"
 )
 
@@ -252,4 +254,14 @@ type SyncResp struct {
 	SyncKey      SyncKey       `json:"SyncKey"`
 	ContinueFlag int           `json:"ContinueFlag"`
 	AddMsgList   []interface{} `json:"AddMsgList"`
+}
+
+// MediaResponse MediaResponse
+type MediaResponse struct {
+	Response
+	MediaID           string `json:"MediaId"`
+	StartPos          int    `json:"StartPos"`
+	CDNThumbImgHeight int    `json:"CDNThumbImgHeight"`
+	CDNThumbImgWidth  int    `json:"CDNThumbImgWidth"`
+	EncryFileName     string `json:"EncryFileName"`
 }
