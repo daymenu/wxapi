@@ -234,7 +234,7 @@ func main() {
 func (hw *httpWechat) initLogin(ctx context.Context) {
 	for wx := range wechatChan {
 		if !wx.IsLogin() {
-			loginCtx, cancel := context.WithDeadline(ctx, time.Now().Add(360*time.Second))
+			loginCtx, cancel := context.WithDeadline(ctx, time.Now().Add(120*time.Second))
 			fmt.Println(cancel)
 			go wx.Login(loginCtx)
 		}

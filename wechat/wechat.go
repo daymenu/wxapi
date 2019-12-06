@@ -16,6 +16,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -344,26 +345,54 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 		return
 	}
 	w.Log.Printf("%s UploadMedia: mediaPath:%s", w.GetUUID(), mediaPath)
-
-	bodyBuf := bytes.NewBufferString("")
+	f, err := os.Open(mediaPath)
+	if err != nil {
+		return
+	}
+	fStat, err := f.Stat()
+	if err != nil {
+		return
+	}
+	bodyBuf := new(bytes.Buffer)
 	bodyWriter := multipart.NewWriter(bodyBuf)
-
-	_, err = bodyWriter.CreateFormFile("name", "haha.jpg")
+	_, filename := filepath.Split(mediaPath)
+	fw, err := bodyWriter.CreateFormFile("filename", filename)
+	if _, err = io.Copy(fw, f); err != nil {
+		return
+	}
 	if err != nil {
 		w.Log.Printf("UploadMedia: %s bodyWriter.CreateFormFile faild %+v", w.GetUUID(), err)
 		return
 	}
-	f, err := os.Open(mediaPath)
+	fInfo := strings.Split(filename, ".")
+	if len(fInfo) != 2 {
+		err = fmt.Errorf("文件没有后缀")
+	}
+	ext := fInfo[1]
+	fw, _ = bodyWriter.CreateFormField("id")
+	fw.Write([]byte("WU_FILE_0"))
+	fw, _ = bodyWriter.CreateFormField("name")
+	fw.Write([]byte(filename))
+	fw, _ = bodyWriter.CreateFormField("type")
+	if ext == "gif" {
+		fw.Write([]byte("image/gif"))
+	} else {
+		fw.Write([]byte("image/jpeg"))
+	}
+	fw, _ = bodyWriter.CreateFormField("lastModifieDate")
+	fw.Write([]byte("Mon Feb 13 2017 17:27:23 GMT+8000(CST)"))
+	fw, _ = bodyWriter.CreateFormField("size")
+
+	fw.Write([]byte(strconv.FormatInt(fStat.Size(), 10)))
+	fw, _ = bodyWriter.CreateFormField("mediatype")
+	if ext == "gif" {
+		fw.Write([]byte("doc"))
+	} else {
+		fw.Write([]byte("pic"))
+	}
 	if err != nil {
 		w.Log.Printf("UploadMedia: %s open faild %+v", w.GetUUID(), err)
 		return
-	}
-	boundary := bodyWriter.Boundary()
-	closeBuf := bytes.NewBufferString(fmt.Sprintf("\r\n--%s--\r\n", boundary))
-	requestReader := io.MultiReader(bodyBuf, f, closeBuf)
-	stat, err := f.Stat()
-	if err != nil {
-		w.Log.Printf("UploadMedia: %s: f stat faild", w.GetUUID())
 	}
 
 	wxurl := fmt.Sprintf("%s?pass_ticket=%s&fun=async&skey=%s&r=%d",
@@ -372,12 +401,11 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 		w.Request.BaseRequest.Skey,
 		time.Now().Unix(),
 	)
-	req, err := http.NewRequest(http.MethodPost, wxurl, requestReader)
+
+	req, err := http.NewRequest(http.MethodPost, wxurl, nil)
 	if err != nil {
 		return
 	}
-	req.Header.Add("Content-Type", "multipart/form-data;boundary="+boundary)
-	req.ContentLength = stat.Size() + int64(bodyBuf.Len()) + int64(closeBuf.Len())
 	fmt.Println(wxurl)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
