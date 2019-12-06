@@ -401,8 +401,21 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 		w.Request.BaseRequest.Skey,
 		time.Now().Unix(),
 	)
+	uploadResp := Request{
+		BaseRequest:   w.Request.BaseRequest,
+		TotalLen:      fStat.Size(),
+		StartPos:      0,
+		DataLen:       fStat.Size(),
+		ClientMediaID: mediaID,
+	}
+	jur, err := json.Marshal(uploadResp)
+	fw, _ = bodyWriter.CreateFormField("uploadmediarequest")
+	fw.Write(jur)
+	fw, _ = bodyWriter.CreateFormField("webwx_data_ticket")
+	req, err := http.NewRequest(http.MethodPost, wxurl, bodyBuf)
+	req.Header.Add("Content-Type", bodyWriter.FormDataContentType())
+	req.Header.Add("User-Agent", UserAgent)
 
-	req, err := http.NewRequest(http.MethodPost, wxurl, nil)
 	if err != nil {
 		return
 	}

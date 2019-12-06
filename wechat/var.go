@@ -119,6 +119,11 @@ type Request struct {
 	ChatRoomName  string `json:",omitempty"`
 	DelMemberList string `json:",omitempty"`
 	AddMemberList string `json:",omitempty"`
+	ClientMediaID string `json:",omitempty"`
+	TotalLen      int64  `json:",omitempty"`
+	StartPos      int    `json:",omitempty"`
+	DataLen       int64  `json:",omitempty"`
+	MediaType     int    `json:",omitempty"`
 }
 
 // User user struct
