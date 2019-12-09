@@ -77,6 +77,10 @@ func (hw *httpWechat) Qr(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(qrJSON)
 }
 
+// 【未扫码的话】 -> window.code=408;
+// 【手机扫码但是未登录】 -> window.code = 201;
+// 【手机取消登录】 -> window.code=400;
+// 【手机授权登录】 -> window.code=200;
 func (hw *httpWechat) Login(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Add("Content-Type", "application/json; charset=UTF-8")
 	type WebResp struct {
@@ -121,21 +125,21 @@ func (hw *httpWechat) GetContactList(rw http.ResponseWriter, req *http.Request) 
 			log.Print(err)
 		}
 
-		logger.Printf("GetContactList:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
+		logger.Printf("GetContactList:userId=%s response%s ip: %s", uuid, string(qrJSON), req.RemoteAddr)
 		rw.Write(qrJSON)
 		return
 	}
 	cr, err := ww.GetContactList()
 	if err != nil {
-		webResp.Code = FetchFaildCode
-		webResp.Message = "请求失败，请重试"
+		webResp.Code = LoginFaildCode
+		webResp.Message = err.Error()
 	}
 	webResp.ContractResponse = cr
 	qrJSON, err := json.Marshal(webResp)
 	if err != nil {
 		log.Print(err)
 	}
-	logger.Printf("GetContactList:userId=%s response%s ip: %s", uuid, qrJSON, req.RemoteAddr)
+	logger.Printf("GetContactList:userId=%s response%s ip: %s", uuid, string(qrJSON), req.RemoteAddr)
 	rw.Write(qrJSON)
 }
 
@@ -225,8 +229,8 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", HTTPPort)
 
-	fmt.Printf("version:0.03 wxapi start as %s\n", addr)
-	logger.Printf("version:0.03 wxapi start as %s", addr)
+	fmt.Printf("version:0.04 wxapi start as %s\n", addr)
+	logger.Printf("version:0.04 wxapi start as %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
@@ -242,5 +246,13 @@ func (hw *httpWechat) initLogin(ctx context.Context) {
 }
 
 func (hw *httpWechat) syncCheck() {
-
+	for key, wx := range hw.wechat {
+		go func(key string, wx *wechat.Wechat) {
+			syncResp, err := wx.SyncCheck()
+			if err != nil {
+				delete(hw.wechat, key)
+			}
+			fmt.Println(syncResp)
+		}(key, wx)
+	}
 }

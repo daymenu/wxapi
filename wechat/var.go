@@ -236,7 +236,7 @@ type MemberResp struct {
 // ContractResponse ContractResponse
 type ContractResponse struct {
 	GroupMemberList []Member `json:"groupMembers"`
-	PublicUserList  []Member `json:"publicUsers"`
+	PublicUserList  []Member `json:"-"`
 	ContactList     []Member `json:"contacts"`
 }
 

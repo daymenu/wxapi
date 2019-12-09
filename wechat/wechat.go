@@ -187,6 +187,9 @@ func (w *Wechat) GetContactList() (contractResponse *ContractResponse, err error
 		w.Log.Printf("webwxgetcontact: %+v", err)
 		return nil, err
 	}
+	if wxResponse.BaseResponse.Ret != 0 {
+		return nil, fmt.Errorf("登录过期，请重新登录")
+	}
 	respjson, err := json.Marshal(wxResponse)
 	w.Log.Printf("%s GetContactList resp: %s", w.GetUUID(), string(respjson))
 	if w.Response.BaseResponse.Ret != StatusSuccess {
@@ -347,21 +350,26 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 	w.Log.Printf("%s UploadMedia: mediaPath:%s", w.GetUUID(), mediaPath)
 	f, err := os.Open(mediaPath)
 	if err != nil {
+		w.Log.Printf("%s  UploadMedia: open file faild %+v", w.GetUUID(), err)
 		return
 	}
 	fStat, err := f.Stat()
 	if err != nil {
+		w.Log.Printf("%s  UploadMedia: file stat faild %+v", w.GetUUID(), err)
 		return
 	}
 	bodyBuf := new(bytes.Buffer)
 	bodyWriter := multipart.NewWriter(bodyBuf)
 	_, filename := filepath.Split(mediaPath)
 	fw, err := bodyWriter.CreateFormFile("filename", filename)
-	if _, err = io.Copy(fw, f); err != nil {
-		return
-	}
+
 	if err != nil {
 		w.Log.Printf("UploadMedia: %s bodyWriter.CreateFormFile faild %+v", w.GetUUID(), err)
+		return
+	}
+	if _, err = io.Copy(fw, f); err != nil {
+		fmt.Println(err, err == nil)
+		w.Log.Printf("%s  UploadMedia: file copy faild %+v", w.GetUUID(), err)
 		return
 	}
 	fInfo := strings.Split(filename, ".")
@@ -412,24 +420,33 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 	fw, _ = bodyWriter.CreateFormField("uploadmediarequest")
 	fw.Write(jur)
 	fw, _ = bodyWriter.CreateFormField("webwx_data_ticket")
+	fw, _ = bodyWriter.CreateFormField("pass_ticket")
+	fw.Write([]byte(w.Request.BaseRequest.PassTicket))
+	bodyWriter.Close()
 	req, err := http.NewRequest(http.MethodPost, wxurl, bodyBuf)
 	req.Header.Add("Content-Type", bodyWriter.FormDataContentType())
 	req.Header.Add("User-Agent", UserAgent)
 
 	if err != nil {
+		w.Log.Printf("UploadMedia: %s NewRequest faild %+v", w.GetUUID(), err)
 		return
 	}
 	fmt.Println(wxurl)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		w.Log.Printf("UploadMedia: %s client do faild %+v", w.GetUUID(), err)
 		return
 	}
 	defer resp.Body.Close()
+	respBody, err := ioutil.ReadAll(resp.Body)
+	w.Log.Println("UploadMedia: respBody:", string(respBody))
 	mediaResp := new(MediaResponse)
-	if err = json.NewDecoder(resp.Body).Decode(mediaResp); err != nil {
+	if err = json.NewDecoder(bytes.NewReader(respBody)).Decode(mediaResp); err != io.EOF {
+		w.Log.Printf("UploadMedia: %s json decode faild %+v", w.GetUUID(), err)
 		return
 	}
 
+	w.Log.Printf("%+v", mediaResp)
 	return mediaResp.MediaID, nil
 }
 
