@@ -15,7 +15,7 @@ const (
 
 // brower
 const (
-	UserAgent       = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.109 Safari/537.36"
+	UserAgent       = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"
 	Lang            = "zh-CN"
 	ContentTypeJSON = "application/json; charset=UTF-8"
 )

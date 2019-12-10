@@ -433,6 +433,10 @@ func (w *Wechat) UploadMedia(mediaPath string) (mediaID string, err error) {
 	}
 	fmt.Println(wxurl)
 	resp, err := http.DefaultClient.Do(req)
+	if resp.StatusCode != http.StatusOK {
+		w.Log.Printf("UploadMedia: %s client do faild status code = %d", w.GetUUID(), resp.StatusCode)
+		return
+	}
 	if err != nil {
 		w.Log.Printf("UploadMedia: %s client do faild %+v", w.GetUUID(), err)
 		return
